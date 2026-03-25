@@ -9,18 +9,24 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        default: "bg-primary text-primary-foreground [a]:hover:bg-primary/80",
+        default:
+          "bg-primary/90 text-primary-foreground transition-colors hover:bg-primary",
+
         outline:
-          "border-border bg-background hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground dark:border-input dark:bg-input/30 dark:hover:bg-input/50",
+          "border border-white/10 bg-transparent transition hover:bg-white/5 hover:text-white",
+
         secondary:
-          "bg-secondary text-secondary-foreground hover:bg-secondary/80 aria-expanded:bg-secondary aria-expanded:text-secondary-foreground",
-        ghost:
-          "hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground dark:hover:bg-muted/50",
+          "border border-white/10 bg-white/5 text-white transition hover:bg-white/10",
+
+        ghost: "text-white/70 transition hover:bg-white/5 hover:text-white",
+
         destructive:
-          "bg-destructive/10 text-destructive hover:bg-destructive/20 focus-visible:border-destructive/40 focus-visible:ring-destructive/20 dark:bg-destructive/20 dark:hover:bg-destructive/30 dark:focus-visible:ring-destructive/40",
+          "border border-red-500/20 bg-red-500/10 text-red-400 transition hover:bg-red-500/20",
+
         link: "text-primary underline-offset-4 hover:underline",
+
         green:
-          "bg-emerald-500/90 text-white transition-colors hover:bg-emerald-500",
+          "border border-emerald-500/80 bg-emerald-500/70 text-emerald-400 transition hover:bg-emerald-500/20",
       },
       size: {
         default:

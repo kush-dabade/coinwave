@@ -1,4 +1,5 @@
 import Dashboard from "./components/Dashboard"
+import Footer from "./components/Footer"
 import Navbar from "./components/Navbar"
 
 export function App() {
@@ -8,6 +9,7 @@ export function App() {
         <div>
           <Navbar />
           <Dashboard />
+          <Footer />
         </div>
       </div>
     </div>
