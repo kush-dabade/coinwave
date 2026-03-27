@@ -22,7 +22,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useCallback } from "react"
 
 interface ChartDataPoint {
   date: string
@@ -47,7 +47,192 @@ interface GlobalData {
   }
 }
 
-// ✅ moved outside
+interface CoinWithWeight extends Coin {
+  weight: number
+}
+
+interface HeatmapDataPoint {
+  name: string
+  symbol: string
+  size: number
+  change: number
+  [key: string]: string | number
+}
+
+interface CustomContentProps {
+  x: number
+  y: number
+  width: number
+  height: number
+  name: string
+  symbol: string
+  change: number
+}
+
+const PORTFOLIO_WEIGHTS = [
+  { id: "bitcoin", weight: 28 },
+  { id: "ethereum", weight: 22 },
+  { id: "tether", weight: 6 },
+  { id: "binancecoin", weight: 5 },
+  { id: "solana", weight: 5 },
+  { id: "ripple", weight: 4 },
+  { id: "usd-coin", weight: 4 },
+  { id: "cardano", weight: 3 },
+  { id: "avalanche-2", weight: 3 },
+  { id: "dogecoin", weight: 3 },
+  { id: "polkadot", weight: 2 },
+  { id: "chainlink", weight: 2 },
+  { id: "polygon", weight: 2 },
+  { id: "litecoin", weight: 2 },
+  { id: "uniswap", weight: 1.5 },
+  { id: "cosmos", weight: 1.5 },
+  { id: "stellar", weight: 1.5 },
+  { id: "monero", weight: 1.5 },
+  { id: "ethereum-classic", weight: 1 },
+  { id: "filecoin", weight: 1 },
+  { id: "near", weight: 1 },
+  { id: "aptos", weight: 1 },
+  { id: "arbitrum", weight: 1.5 },
+  { id: "optimism", weight: 1 },
+]
+
+async function fetchDashboardData() {
+  const [globalRes, coinsRes, chartRes] = await Promise.all([
+    fetch("https://api.coingecko.com/api/v3/global"),
+    fetch("https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd"),
+    fetch(
+      "https://api.coingecko.com/api/v3/coins/bitcoin/market_chart?vs_currency=usd&days=7"
+    ),
+  ])
+
+  const globalJson = await globalRes.json()
+  const coinsJson: Coin[] = await coinsRes.json()
+  const chartJson = await chartRes.json()
+
+  const marketFormatted: ChartDataPoint[] = chartJson.prices.map(
+    (item: [number, number]) => ({
+      date: new Date(item[0]).toLocaleDateString("en-US", { weekday: "short" }),
+      value: item[1],
+    })
+  )
+
+  const volumeFormatted: ChartDataPoint[] = chartJson.total_volumes.map(
+    (item: [number, number]) => ({
+      date: new Date(item[0]).toLocaleDateString("en-US", { weekday: "short" }),
+      value: item[1],
+    })
+  )
+
+  return {
+    globalData: globalJson.data as GlobalData,
+    coins: coinsJson,
+    marketChart: marketFormatted,
+    volumeChart: volumeFormatted,
+  }
+}
+
+function getHeatmapColor(value: number = 0): string {
+  const intensity = Math.min(Math.abs(value), 10)
+  return value >= 0
+    ? `rgba(34, 197, 94, ${0.35 + intensity / 15})`
+    : `rgba(239, 68, 68, ${0.35 + intensity / 15})`
+}
+
+function CustomContent({ x, y, width, height, symbol, change }: CustomContentProps) {
+  const area = width * height
+
+  return (
+    <g style={{ transition: "all 0.2s ease" }}>
+      <rect
+        x={x}
+        y={y}
+        width={width}
+        height={height}
+        rx={6}
+        style={{
+          fill: getHeatmapColor(change),
+          stroke: "rgba(0,0,0,0.4)",
+          strokeWidth: 1,
+          cursor: "pointer",
+        }}
+      />
+      {area > 2500 && (
+        <>
+          <text
+            x={x + width / 2}
+            y={y + height / 2 - 5}
+            textAnchor="middle"
+            fill="white"
+            fontSize={13}
+            fontWeight={700}
+            stroke="none"
+          >
+            {symbol}
+          </text>
+          <text
+            x={x + width / 2}
+            y={y + height / 2 + 12}
+            textAnchor="middle"
+            fill="white"
+            fontSize={10}
+            opacity={0.8}
+            stroke="none"
+          >
+            {typeof change === "number"
+              ? `${change > 0 ? "+" : ""}${change.toFixed(2)}%`
+              : ""}
+          </text>
+        </>
+      )}
+      {area > 800 && area <= 2500 && (
+        <text
+          x={x + width / 2}
+          y={y + height / 2}
+          textAnchor="middle"
+          fill="white"
+          fontSize={10}
+          fontWeight={600}
+          stroke="none"
+        >
+          {symbol}
+        </text>
+      )}
+      {area > 300 && area <= 800 && (
+        <text
+          x={x + width / 2}
+          y={y + height / 2}
+          textAnchor="middle"
+          fill="white"
+          fontSize={8}
+          opacity={0.7}
+          stroke="none"
+        >
+          {symbol}
+        </text>
+      )}
+    </g>
+  )
+}
+
+function PortfolioHeatmap({ data }: { data: HeatmapDataPoint[] }) {
+  return (
+    <div className="h-70 w-full min-w-0">
+      <ResponsiveContainer>
+        <Treemap
+          data={data}
+          dataKey="size"
+          content={
+            <CustomContent
+              x={0} y={0} width={0} height={0}
+              name="" symbol="" change={0}
+            />
+          }
+        />
+      </ResponsiveContainer>
+    </div>
+  )
+}
+
 function MiniChart({ data }: { data: ChartDataPoint[] }) {
   return (
     <div className="mt-3 h-32">
@@ -82,218 +267,34 @@ const Dashboard = () => {
   const [marketChart, setMarketChart] = useState<ChartDataPoint[]>([])
   const [volumeChart, setVolumeChart] = useState<ChartDataPoint[]>([])
 
-  useEffect(() => {
-    fetchData()
+  const loadData = useCallback(async () => {
+    try {
+      const data = await fetchDashboardData()
+      setGlobalData(data.globalData)
+      setCoins(data.coins)
+      setMarketChart(data.marketChart)
+      setVolumeChart(data.volumeChart)
+    } catch (err) {
+      console.error("Failed to fetch dashboard data:", err)
+    }
   }, [])
 
-  const portfolio = [
-    // 🟦 LARGE CAPS (dominant blocks)
-    { id: "bitcoin", weight: 28 },
-    { id: "ethereum", weight: 22 },
+  useEffect(() => {
+    loadData()
+  }, [loadData])
 
-    // 🟩 LARGE / MID
-    { id: "tether", weight: 6 },
-    { id: "binancecoin", weight: 5 },
-    { id: "solana", weight: 5 },
-    { id: "ripple", weight: 4 },
-    { id: "usd-coin", weight: 4 },
+const portfolioCoins: CoinWithWeight[] = PORTFOLIO_WEIGHTS.flatMap((p) => {
+    const coin = coins.find((c) => c.id === p.id)
+    return coin ? [{ ...coin, weight: p.weight }] : []
+  })
 
-    // 🟨 MID CAPS
-    { id: "cardano", weight: 3 },
-    { id: "avalanche-2", weight: 3 },
-    { id: "dogecoin", weight: 3 },
-    { id: "polkadot", weight: 2 },
-    { id: "chainlink", weight: 2 },
-    { id: "polygon", weight: 2 },
-    { id: "litecoin", weight: 2 },
-
-    // 🟧 SMALL CAPS (fills heatmap nicely)
-    { id: "uniswap", weight: 1.5 },
-    { id: "cosmos", weight: 1.5 },
-    { id: "stellar", weight: 1.5 },
-    { id: "monero", weight: 1.5 },
-    { id: "ethereum-classic", weight: 1 },
-    { id: "filecoin", weight: 1 },
-    { id: "near", weight: 1 },
-    { id: "aptos", weight: 1 },
-    { id: "arbitrum", weight: 1.5 },
-    { id: "optimism", weight: 1 },
-  ]
-  interface CoinWithWeight extends Coin {
-    weight: number
-  }
-
-  const portfolioCoins = portfolio
-    .map((p) => {
-      const coin = coins.find((c) => c.id === p.id)
-      if (!coin) return null
-      return { ...coin, weight: p.weight }
-    })
-    .filter(Boolean) as CoinWithWeight[]
-
-  interface HeatmapDataPoint {
-    name: string
-    size: number
-    change: number
-    [key: string]: string | number
-  }
-
-  const heatmapData = portfolioCoins.map((coin: CoinWithWeight) => ({
-    name: coin.symbol
-      ? coin.symbol.toUpperCase()
-      : coin.name.slice(0, 4).toUpperCase(),
-    symbol: coin.symbol
-      ? coin.symbol.toUpperCase()
-      : coin.name.slice(0, 4).toUpperCase(),
+  const heatmapData: HeatmapDataPoint[] = portfolioCoins.map((coin) => ({
+    name: coin.symbol ? coin.symbol.toUpperCase() : coin.name.slice(0, 4).toUpperCase(),
+    symbol: coin.symbol ? coin.symbol.toUpperCase() : coin.name.slice(0, 4).toUpperCase(),
     size: coin.weight,
     change: coin.price_change_percentage_24h,
   }))
-  function PortfolioHeatmap({ data }: { data: HeatmapDataPoint[] }) {
-    const getColor = (value: number = 0) => {
-      const intensity = Math.min(Math.abs(value), 10)
 
-      if (value >= 0) {
-        return `rgba(34, 197, 94, ${0.35 + intensity / 15})`
-      } else {
-        return `rgba(239, 68, 68, ${0.35 + intensity / 15})`
-      }
-    }
-    const CustomContent = (props: {
-      x: number
-      y: number
-      width: number
-      height: number
-      name: string
-      change: number
-    }) => {
-      const { x, y, width, height, name, change, symbol } = props
-      const area = width * height
-
-      return (
-        <g style={{ transition: "all 0.2s ease" }}>
-          <rect
-            x={x}
-            y={y}
-            width={width}
-            height={height}
-            rx={6}
-            style={{
-              fill: getColor(change),
-              stroke: "rgba(0,0,0,0.4)",
-              strokeWidth: 1,
-              cursor: "pointer",
-            }}
-          />
-          {/* LARGE */}
-          {area > 2500 && (
-            <>
-              <text
-                x={x + width / 2}
-                y={y + height / 2 - 5}
-                textAnchor="middle"
-                fill="white"
-                fontSize={13}
-                fontWeight={700}
-                stroke="none"
-              >
-                {symbol}
-              </text>
-
-              <text
-                x={x + width / 2}
-                y={y + height / 2 + 12}
-                textAnchor="middle"
-                fill="white"
-                fontSize={10}
-                opacity={0.8}
-                stroke="none"
-              >
-                {typeof change === "number"
-                  ? `${change > 0 ? "+" : ""}${change.toFixed(2)}%`
-                  : ""}
-              </text>
-            </>
-          )}
-          {/* MEDIUM */}
-          {area > 800 && area <= 2500 && (
-            <text
-              x={x + width / 2}
-              y={y + height / 2}
-              textAnchor="middle"
-              fill="white"
-              fontSize={10}
-              fontWeight={600}
-              stroke="none"
-            >
-              {symbol}
-            </text>
-          )}
-          {/* SMALL */}
-          {area > 300 && area <= 800 && (
-            <text
-              x={x + width / 2}
-              y={y + height / 2}
-              textAnchor="middle"
-              fill="white"
-              fontSize={8}
-              opacity={0.7}
-              stroke="none"
-            >
-              {symbol}
-            </text>
-          )}
-        </g>
-      )
-    }
-
-    return (
-      <div className="h-70 w-full min-w-0">
-        <ResponsiveContainer>
-          <Treemap data={data} dataKey="size" content={<CustomContent />} />
-        </ResponsiveContainer>
-      </div>
-    )
-  }
-  async function fetchData() {
-    try {
-      const [globalRes, coinsRes, chartRes] = await Promise.all([
-        fetch("https://api.coingecko.com/api/v3/global"),
-        fetch("https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd"),
-        fetch(
-          "https://api.coingecko.com/api/v3/coins/bitcoin/market_chart?vs_currency=usd&days=7"
-        ),
-      ])
-
-      const globalJson = await globalRes.json()
-      const coinsJson = await coinsRes.json()
-      const chartJson = await chartRes.json()
-
-      setGlobalData(globalJson.data)
-      setCoins(coinsJson)
-
-      const marketFormatted = chartJson.prices.map(
-        (item: [number, number]) => ({
-          date: new Date(item[0]).toLocaleDateString("en-US", {
-            weekday: "short",
-          }),
-          value: item[1],
-        })
-      )
-
-      const volumeFormatted = chartJson.total_volumes.map(
-        (item: [number, number]) => ({
-          date: new Date(item[0]).toLocaleDateString("en-US", {
-            weekday: "short",
-          }),
-          value: item[1],
-        })
-      )
-      setMarketChart(marketFormatted)
-      setVolumeChart(volumeFormatted)
-    } catch (err) {
-      console.error(err)
-    }
-  }
 
   return (
     <div className="my-6 space-y-6">
