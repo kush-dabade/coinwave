@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/set-state-in-effect */
 import { Button } from "./ui/button"
 import {
   Card,
@@ -138,7 +139,14 @@ function getHeatmapColor(value: number = 0): string {
     : `rgba(239, 68, 68, ${0.35 + intensity / 15})`
 }
 
-function CustomContent({ x, y, width, height, symbol, change }: CustomContentProps) {
+function CustomContent({
+  x,
+  y,
+  width,
+  height,
+  symbol,
+  change,
+}: CustomContentProps) {
   const area = width * height
 
   return (
@@ -223,8 +231,13 @@ function PortfolioHeatmap({ data }: { data: HeatmapDataPoint[] }) {
           dataKey="size"
           content={
             <CustomContent
-              x={0} y={0} width={0} height={0}
-              name="" symbol="" change={0}
+              x={0}
+              y={0}
+              width={0}
+              height={0}
+              name=""
+              symbol=""
+              change={0}
             />
           }
         />
@@ -283,32 +296,38 @@ const Dashboard = () => {
     loadData()
   }, [loadData])
 
-const portfolioCoins: CoinWithWeight[] = PORTFOLIO_WEIGHTS.flatMap((p) => {
+  const portfolioCoins: CoinWithWeight[] = PORTFOLIO_WEIGHTS.flatMap((p) => {
     const coin = coins.find((c) => c.id === p.id)
     return coin ? [{ ...coin, weight: p.weight }] : []
   })
 
   const heatmapData: HeatmapDataPoint[] = portfolioCoins.map((coin) => ({
-    name: coin.symbol ? coin.symbol.toUpperCase() : coin.name.slice(0, 4).toUpperCase(),
-    symbol: coin.symbol ? coin.symbol.toUpperCase() : coin.name.slice(0, 4).toUpperCase(),
+    name: coin.symbol
+      ? coin.symbol.toUpperCase()
+      : coin.name.slice(0, 4).toUpperCase(),
+    symbol: coin.symbol
+      ? coin.symbol.toUpperCase()
+      : coin.name.slice(0, 4).toUpperCase(),
     size: coin.weight,
     change: coin.price_change_percentage_24h,
   }))
-
 
   return (
     <div className="my-6 space-y-6">
       <Card className="border-white/10 bg-white/5 px-4 py-4">
         <CardHeader className="mb-4 flex flex-row items-start justify-between p-0">
+          {/* LEFT */}
           <div>
             <CardTitle className="text-xl font-semibold tracking-tight">
               Market Overview
             </CardTitle>
+
             <CardDescription className="mt-1 text-sm text-white/60">
               Welcome back, Admin. Here's what's happening today.
             </CardDescription>
           </div>
 
+          {/* RIGHT */}
           <div className="flex items-center gap-2 rounded-md bg-white/5 p-1">
             <Button
               variant="secondary"
@@ -324,7 +343,6 @@ const portfolioCoins: CoinWithWeight[] = PORTFOLIO_WEIGHTS.flatMap((p) => {
             </Button>
           </div>
         </CardHeader>
-
         <CardContent className="p-0">
           <div className="grid grid-cols-3 gap-4">
             {/* Market Cap */}
