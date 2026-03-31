@@ -14,32 +14,50 @@ import {
 
 export default function PortfolioPage() {
   const [prices, setPrices] = useState<Record<string, number>>({})
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
 
   useEffect(() => {
     const fetchPrices = async () => {
-      const ids = Object.values(COIN_MAP).join(",")
-      const res = await fetch(
-        `https://api.coingecko.com/api/v3/simple/price?ids=${ids}&vs_currencies=usd`
-      )
-      const data = await res.json()
+      try {
+        // pause if tab inactive (important)
+        if (document.hidden) return
 
-      const formatted: Record<string, number> = {}
-      Object.entries(COIN_MAP).forEach(([s, id]) => {
-        formatted[s] = data[id]?.usd || 0
-      })
-      setPrices(formatted)
+        const ids = Object.values(COIN_MAP).join(",")
+        const res = await fetch(
+          `https://api.coingecko.com/api/v3/simple/price?ids=${ids}&vs_currencies=usd`
+        )
+        const data = await res.json()
+
+        const formatted: Record<string, number> = {}
+        Object.entries(COIN_MAP).forEach(([s, id]) => {
+          formatted[s] = data[id]?.usd || 0
+        })
+
+        setPrices(formatted)
+        setLastUpdated(new Date())
+      } catch (err) {
+        console.error("Price fetch failed", err)
+      }
     }
+
     fetchPrices()
+
+    // 15 sec refresh (sweet spot)
+    const interval = setInterval(fetchPrices, 15000)
+
+    return () => clearInterval(interval)
   }, [])
 
   const [open, setOpen] = useState(false)
-  const [holdings, setHoldings] = useState<Holding[]>([])
+  const [holdings, setHoldings] = useState<Holding[]>(() => {
+    try {
+      const saved = localStorage.getItem("coinwave_holdings")
+      return saved ? JSON.parse(saved) : []
+    } catch {
+      return []
+    }
+  })
   const [globalSearch, setGlobalSearch] = useState("")
-
-  useEffect(() => {
-    const saved = localStorage.getItem("coinwave_holdings")
-    if (saved) setHoldings(JSON.parse(saved))
-  }, [])
 
   useEffect(() => {
     localStorage.setItem("coinwave_holdings", JSON.stringify(holdings))
@@ -61,7 +79,7 @@ export default function PortfolioPage() {
         ? holdings.map((h) => ({
             symbol: h.symbol,
             delta: "",
-            price: (prices[h.symbol] || h.avgPrice).toString(),
+            price: h.avgPrice.toString(),
             search: "",
           }))
         : [{ symbol: "", delta: "", price: "", search: "" }]
@@ -164,7 +182,25 @@ export default function PortfolioPage() {
     ? tableData.reduce((a, b) => (a.allocation > b.allocation ? a : b))
     : { symbol: "-", allocation: 0 }
 
-  const diversificationScore = 100 - topHolding.allocation
+  const diversificationScoreAdvanced = (() => {
+    if (!tableData.length) return 0
+
+    const n = tableData.length
+
+    // ideal equal allocation
+    const ideal = 100 / n
+
+    // measure deviation from ideal
+    const deviation =
+      tableData.reduce((sum, asset) => {
+        return sum + Math.abs(asset.allocation - ideal)
+      }, 0) / n
+
+    // convert to score
+    const score = Math.max(0, 100 - deviation)
+
+    return score
+  })()
 
   const chartData = tableData.map((i) => ({
     symbol: i.symbol,
@@ -178,10 +214,17 @@ export default function PortfolioPage() {
     <div className="space-y-6 p-2">
       {/* HEADER */}
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Portfolio</h1>
+        <div>
+          <h1 className="text-2xl font-semibold">Portfolio</h1>
+          <p className="text-xs text-gray-400">
+            {lastUpdated
+              ? `Updated ${lastUpdated.toLocaleTimeString()}`
+              : "Fetching prices..."}
+          </p>
+        </div>
+
         <Button onClick={() => setOpen(true)}>Edit Holdings</Button>
       </div>
-
       {/* SUMMARY */}
       <div className="grid grid-cols-3 gap-6 rounded-2xl bg-neutral-900 p-6">
         <div>
@@ -210,11 +253,103 @@ export default function PortfolioPage() {
         </div>
 
         <div className="rounded-2xl bg-neutral-900 p-6">
-          <h2 className="mb-4">Insights</h2>
-          <p>Score: {diversificationScore.toFixed(0)}</p>
+          <h2 className="mb-4 text-lg font-semibold">Insights</h2>
+
+          <div className="space-y-5">
+            {/* TOP METRICS */}
+            <div className="grid grid-cols-2 gap-4 text-sm">
+              {/* Diversification */}
+              <div className="rounded-xl bg-white/5 p-3">
+                <p className="text-xs text-gray-400">Diversification</p>
+
+                <p className="text-lg font-semibold">
+                  {diversificationScoreAdvanced.toFixed(0)}
+                  <span className="text-xs text-gray-400"> / 100</span>
+                </p>
+
+                <p className="mt-1 text-xs text-gray-500">
+                  {tableData.length} assets •{" "}
+                  {topHolding.allocation > 50
+                    ? "high concentration"
+                    : topHolding.allocation > 30
+                      ? "moderate concentration"
+                      : "well balanced"}
+                </p>
+
+                {/* bar */}
+                <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-white/10">
+                  <div
+                    className="h-full bg-white"
+                    style={{ width: `${diversificationScoreAdvanced}%` }}
+                  />
+                </div>
+              </div>
+
+              {/* Top Holding */}
+              <div className="rounded-xl bg-white/5 p-3">
+                <p className="text-xs text-gray-400">Top Holding</p>
+                <p className="text-lg font-semibold">
+                  {topHolding.symbol}
+                  <span className="ml-1 text-xs text-gray-400">
+                    ({topHolding.allocation.toFixed(1)}%)
+                  </span>
+                </p>
+              </div>
+            </div>
+
+            {/* PERFORMANCE */}
+            <div className="space-y-2 text-sm">
+              <div className="flex justify-between">
+                <span className="text-gray-400">Best Performer</span>
+                <span className="font-medium text-green-400">
+                  {tableData.length
+                    ? (() => {
+                        const best = tableData.reduce((a, b) =>
+                          a.pnlPercent > b.pnlPercent ? a : b
+                        )
+                        return `${best.symbol} (+${best.pnlPercent.toFixed(1)}%)`
+                      })()
+                    : "-"}
+                </span>
+              </div>
+
+              <div className="flex justify-between">
+                <span className="text-gray-400">Worst Performer</span>
+                <span className="font-medium text-red-400">
+                  {tableData.length
+                    ? (() => {
+                        const worst = tableData.reduce((a, b) =>
+                          a.pnlPercent < b.pnlPercent ? a : b
+                        )
+                        return `${worst.symbol} (${worst.pnlPercent.toFixed(1)}%)`
+                      })()
+                    : "-"}
+                </span>
+              </div>
+            </div>
+
+            {/* STATUS */}
+            <div
+              className={`rounded-lg px-3 py-2 text-xs font-medium ${
+                totalPnL > 0
+                  ? "bg-green-500/10 text-green-400"
+                  : "bg-red-500/10 text-red-400"
+              }`}
+            >
+              {totalPnL > 0 ? "Portfolio in Profit" : "Portfolio in Loss"}
+            </div>
+
+            {/* SMART MESSAGE */}
+            <div className="rounded-xl bg-white/5 p-3 text-xs leading-relaxed text-gray-300">
+              {topHolding.allocation > 50
+                ? `You are heavily concentrated in ${topHolding.symbol}. Consider diversifying to reduce risk.`
+                : diversificationScoreAdvanced > 70
+                  ? "Your portfolio is well diversified. Risk is balanced across assets."
+                  : "Your portfolio has moderate concentration. Diversifying further can improve stability."}
+            </div>
+          </div>
         </div>
       </div>
-
       {/* TABLE */}
       <div className="rounded-2xl bg-neutral-900 p-6">
         <DataTable columns={columns} data={tableData} />
@@ -237,7 +372,7 @@ export default function PortfolioPage() {
             />
 
             {globalSearch && (
-              <div className="absolute z-[999] mt-2 max-h-60 w-full overflow-y-auto rounded-xl border border-white/10 bg-neutral-900 shadow-xl">
+              <div className="absolute z-999 mt-2 max-h-60 w-full overflow-y-auto rounded-xl border border-white/10 bg-neutral-900 shadow-xl">
                 {searchCoins(globalSearch)
                   .slice(0, 8)
                   .map(([sym, id]) => (

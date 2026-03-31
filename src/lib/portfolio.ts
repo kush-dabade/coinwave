@@ -14,6 +14,23 @@ export const COIN_MAP: Record<string, string> = {
   BTC: "bitcoin",
   ETH: "ethereum",
   SOL: "solana",
+  BNB: "binancecoin",
+  XRP: "ripple",
+  ADA: "cardano",
+  DOGE: "dogecoin",
+  TRX: "tron",
+  DOT: "polkadot",
+  MATIC: "polygon",
+  AVAX: "avalanche-2",
+  LINK: "chainlink",
+  LTC: "litecoin",
+  BCH: "bitcoin-cash",
+  UNI: "uniswap",
+  ATOM: "cosmos",
+  XLM: "stellar",
+  NEAR: "near",
+  ICP: "internet-computer",
+  APT: "aptos",
 };
 
 export const calculatePortfolioValue = (
