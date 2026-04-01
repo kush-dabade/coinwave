@@ -1,12 +1,12 @@
 /* eslint-disable react-hooks/set-state-in-effect */
-import { Button } from "./ui/button"
+import { Button } from "../components/ui/button"
 import {
   Card,
   CardHeader,
   CardTitle,
   CardDescription,
   CardContent,
-} from "./ui/card"
+} from "../components/ui/card"
 import { Area, AreaChart, XAxis, Treemap, ResponsiveContainer } from "recharts"
 import {
   ChartContainer,
@@ -24,6 +24,8 @@ import {
 } from "@/components/ui/table"
 
 import { useEffect, useState, useCallback } from "react"
+
+import { COIN_MAP } from "@/lib/portfolio"
 
 interface ChartDataPoint {
   date: string
@@ -48,8 +50,10 @@ interface GlobalData {
   }
 }
 
-interface CoinWithWeight extends Coin {
-  weight: number
+type Holding = {
+  symbol: string
+  amount: number
+  avgPrice: number
 }
 
 interface HeatmapDataPoint {
@@ -69,33 +73,6 @@ interface CustomContentProps {
   symbol: string
   change: number
 }
-
-const PORTFOLIO_WEIGHTS = [
-  { id: "bitcoin", weight: 28 },
-  { id: "ethereum", weight: 22 },
-  { id: "tether", weight: 6 },
-  { id: "binancecoin", weight: 5 },
-  { id: "solana", weight: 5 },
-  { id: "ripple", weight: 4 },
-  { id: "usd-coin", weight: 4 },
-  { id: "cardano", weight: 3 },
-  { id: "avalanche-2", weight: 3 },
-  { id: "dogecoin", weight: 3 },
-  { id: "polkadot", weight: 2 },
-  { id: "chainlink", weight: 2 },
-  { id: "polygon", weight: 2 },
-  { id: "litecoin", weight: 2 },
-  { id: "uniswap", weight: 1.5 },
-  { id: "cosmos", weight: 1.5 },
-  { id: "stellar", weight: 1.5 },
-  { id: "monero", weight: 1.5 },
-  { id: "ethereum-classic", weight: 1 },
-  { id: "filecoin", weight: 1 },
-  { id: "near", weight: 1 },
-  { id: "aptos", weight: 1 },
-  { id: "arbitrum", weight: 1.5 },
-  { id: "optimism", weight: 1 },
-]
 
 async function fetchDashboardData() {
   const [globalRes, coinsRes, chartRes] = await Promise.all([
@@ -150,7 +127,7 @@ function CustomContent({
   const area = width * height
 
   return (
-    <g style={{ transition: "all 0.2s ease" }}>
+    <g style={{ transition: "all 0.2s ease, cursor: pointer" }}>
       <rect
         x={x}
         y={y}
@@ -224,24 +201,30 @@ function CustomContent({
 
 function PortfolioHeatmap({ data }: { data: HeatmapDataPoint[] }) {
   return (
-    <div className="h-70 w-full min-w-0">
-      <ResponsiveContainer>
-        <Treemap
-          data={data}
-          dataKey="size"
-          content={
-            <CustomContent
-              x={0}
-              y={0}
-              width={0}
-              height={0}
-              name=""
-              symbol=""
-              change={0}
-            />
-          }
-        />
-      </ResponsiveContainer>
+    <div>
+      <div className="mb-2 flex justify-between text-xs text-white/40">
+        <span>Allocation</span>
+        <span>24h Change</span>
+      </div>
+      <div className="h-72 w-full min-w-0 overflow-hidden rounded-xl">
+        <ResponsiveContainer>
+          <Treemap
+            data={data}
+            dataKey="size"
+            content={
+              <CustomContent
+                x={0}
+                y={0}
+                width={0}
+                height={0}
+                name=""
+                symbol=""
+                change={0}
+              />
+            }
+          />
+        </ResponsiveContainer>
+      </div>
     </div>
   )
 }
@@ -277,8 +260,11 @@ function MiniChart({ data }: { data: ChartDataPoint[] }) {
 const Dashboard = () => {
   const [globalData, setGlobalData] = useState<GlobalData | null>(null)
   const [coins, setCoins] = useState<Coin[]>([])
+  const [holdings, setHoldings] = useState<Holding[]>([])
   const [marketChart, setMarketChart] = useState<ChartDataPoint[]>([])
   const [volumeChart, setVolumeChart] = useState<ChartDataPoint[]>([])
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
+  console.log(lastUpdated)
 
   const loadData = useCallback(async () => {
     try {
@@ -287,38 +273,66 @@ const Dashboard = () => {
       setCoins(data.coins)
       setMarketChart(data.marketChart)
       setVolumeChart(data.volumeChart)
+      setLastUpdated(new Date())
     } catch (err) {
       console.error("Failed to fetch dashboard data:", err)
     }
   }, [])
 
   useEffect(() => {
-    loadData()
+    const fetchSafe = () => {
+      if (document.hidden) return
+      loadData()
+    }
+
+    fetchSafe()
+
+    const interval = setInterval(fetchSafe, 30000)
+
+    return () => clearInterval(interval)
   }, [loadData])
 
-  const portfolioCoins: CoinWithWeight[] = PORTFOLIO_WEIGHTS.flatMap((p) => {
-    const coin = coins.find((c) => c.id === p.id)
-    return coin ? [{ ...coin, weight: p.weight }] : []
+  useEffect(() => {
+    const stored = localStorage.getItem("coinwave_holdings")
+    if (stored) {
+      setHoldings(JSON.parse(stored))
+    }
+  }, [])
+
+  interface CoinWithAmount extends Coin {
+    amount: number
+  }
+
+  const portfolioCoins = holdings.flatMap((h) => {
+    const coinId = COIN_MAP[h.symbol]
+    const coin = coins.find((c) => c.id === coinId)
+
+    return coin ? [{ ...coin, amount: h.amount }] : []
   })
 
-  const heatmapData: HeatmapDataPoint[] = portfolioCoins.map((coin) => ({
-    name: coin.symbol
-      ? coin.symbol.toUpperCase()
-      : coin.name.slice(0, 4).toUpperCase(),
-    symbol: coin.symbol
-      ? coin.symbol.toUpperCase()
-      : coin.name.slice(0, 4).toUpperCase(),
-    size: coin.weight,
-    change: coin.price_change_percentage_24h,
-  }))
+  const totalValue = portfolioCoins.reduce(
+    (sum, c: CoinWithAmount) => sum + c.amount * c.current_price,
+    0
+  )
+
+  const heatmapData = portfolioCoins.map((coin: CoinWithAmount) => {
+    const value = coin.amount * coin.current_price
+
+    return {
+      name: coin.symbol.toUpperCase(),
+      symbol: coin.symbol.toUpperCase(),
+      size: (value / totalValue) * 100,
+      change: coin.price_change_percentage_24h,
+    }
+  })
 
   return (
-    <div className="my-6 space-y-6">
-      <Card className="border-white/10 bg-white/5 px-4 py-4">
+    <div className="my-6 space-y-6 p-2">
+      <Card className="border-white/10 bg-linear-to-b from-white/3 to-white/1 px-5 py-5 shadow-lg shadow-black/20 backdrop-blur-xl">
         <CardHeader className="mb-4 flex flex-row items-start justify-between p-0">
           {/* LEFT */}
           <div>
-            <CardTitle className="text-xl font-semibold tracking-tight">
+            <CardTitle className="text-lg font-semibold tracking-tight">
               Market Overview
             </CardTitle>
 
@@ -326,7 +340,6 @@ const Dashboard = () => {
               Welcome back, Admin. Here's what's happening today.
             </CardDescription>
           </div>
-
           {/* RIGHT */}
           <div className="flex items-center gap-2 rounded-md bg-white/5 p-1">
             <Button
@@ -346,21 +359,26 @@ const Dashboard = () => {
         <CardContent className="p-0">
           <div className="grid grid-cols-3 gap-4">
             {/* Market Cap */}
-            <Card className="min-w-0 border-white/10 bg-white/5 p-4">
-              {" "}
-              <p className="text-sm text-white/60">Market Cap</p>
-              <h2 className="text-lg font-semibold">
-                {globalData
-                  ? `$${(globalData.total_market_cap.usd / 1e12).toFixed(2)}T`
-                  : "Loading..."}
+            <Card className="border-white/10 bg-white/5 p-4 transition-all duration-200 hover:scale-[1.01] hover:bg-white/10">
+              <p className="text-xs tracking-wide text-white/50 uppercase">
+                Market Cap
+              </p>
+              <h2 className="text-xl font-semibold tracking-tight">
+                {globalData ? (
+                  `$${(globalData.total_market_cap.usd / 1e12).toFixed(2)}T`
+                ) : (
+                  <div className="h-6 w-24 animate-pulse rounded bg-white/10" />
+                )}
               </h2>
               {marketChart.length > 0 && <MiniChart data={marketChart} />}
             </Card>
 
             {/* Volume */}
-            <Card className="min-w-0 border-white/10 bg-white/5 p-4">
-              <p className="text-sm text-white/60">24h Volume</p>
-              <h2 className="text-lg font-semibold">
+            <Card className="border-white/10 bg-white/5 p-4 transition-all duration-200 hover:scale-[1.01] hover:bg-white/10">
+              <p className="text-xs tracking-wide text-white/50 uppercase">
+                24h Volume
+              </p>
+              <h2 className="text-xl font-semibold tracking-tight">
                 {globalData
                   ? `$${(globalData.total_volume.usd / 1e9).toFixed(2)}B`
                   : "Loading..."}
@@ -369,8 +387,10 @@ const Dashboard = () => {
             </Card>
 
             {/* Trending */}
-            <Card className="border-white/10 bg-white/5 p-4">
-              <p className="text-sm text-white/60">Trending Currencies</p>
+            <Card className="border-white/10 bg-white/5 p-4 transition-all duration-200 hover:scale-[1.01] hover:bg-white/10">
+              <p className="text-xs tracking-wide text-white/50 uppercase">
+                Trending Currencies
+              </p>
               <div className="mt-1 text-sm font-medium">
                 {coins.length > 0 ? (
                   <div className="divide-y divide-white/10">
@@ -380,7 +400,7 @@ const Dashboard = () => {
                       return (
                         <div
                           key={coin.id}
-                          className="flex items-center justify-between py-2 first:pt-0 last:pb-0"
+                          className="flex items-center justify-between rounded-md py-2 transition-all duration-150 first:pt-0 last:pb-0 hover:translate-x-0.5 hover:bg-white/5"
                         >
                           {/* LEFT */}
                           <div className="flex items-center gap-3">
@@ -416,16 +436,18 @@ const Dashboard = () => {
                     })}
                   </div>
                 ) : (
-                  "Loading..."
+                  <div className="flex h-40 items-center justify-center text-sm text-white/40">
+                    No portfolio data yet
+                  </div>
                 )}
               </div>
             </Card>
           </div>
         </CardContent>
       </Card>
-      <Card className="border-white/10 bg-white/5 px-4 py-4">
+      <Card className="border-white/10 bg-linear-to-b from-white/3 to-white/1 px-5 py-5 shadow-lg shadow-black/20 backdrop-blur-xl">
         <CardHeader className="mb-4 p-0">
-          <CardTitle className="text-lg font-semibold">
+          <CardTitle className="text-xl font-semibold tracking-tight">
             Portfolio & Market
           </CardTitle>
           <CardDescription className="text-sm text-white/60">
@@ -436,7 +458,7 @@ const Dashboard = () => {
         <CardContent className="p-0">
           <div className="grid grid-cols-2 gap-4">
             {/* HEATMAP */}
-            <Card className="border-white/10 bg-white/5 p-4">
+            <Card className="border-white/10 bg-white/5 p-4 transition-all duration-200 hover:scale-[1.01] hover:bg-white/10">
               <p className="mb-3 text-sm text-white/60">Portfolio Heatmap</p>
 
               {portfolioCoins.length > 0 ? (
@@ -447,15 +469,21 @@ const Dashboard = () => {
             </Card>
 
             {/* ALL COINS TABLE */}
-            <Card className="border-white/10 bg-white/5 p-4">
+            <Card className="border-white/10 bg-white/5 p-4 transition-all duration-200 hover:scale-[1.01] hover:bg-white/10">
               <p className="mb-3 text-sm text-white/60">All Coins</p>
               <div className="max-h-72 overflow-y-auto pr-2">
                 <Table>
-                  <TableHeader className="sticky top-0 bg-black/30 backdrop-blur">
-                    <TableRow className="border-white/10">
-                      <TableHead>Coin</TableHead>
-                      <TableHead>Price</TableHead>
-                      <TableHead className="text-right">24h</TableHead>
+                  <TableHeader className="sticky top-0 bg-black/10 backdrop-blur">
+                    <TableRow className="border-white/10 transition even:bg-white/2 hover:bg-white/5">
+                      <TableHead className="text-xs tracking-wide text-white/50 uppercase">
+                        Coin
+                      </TableHead>
+                      <TableHead className="text-xs tracking-wide text-white/50 uppercase">
+                        Price
+                      </TableHead>
+                      <TableHead className="text-right text-xs tracking-wide text-white/50 uppercase">
+                        24h
+                      </TableHead>
                     </TableRow>
                   </TableHeader>
 
@@ -469,7 +497,7 @@ const Dashboard = () => {
                       return (
                         <TableRow
                           key={coin.id}
-                          className="border-white/10 transition hover:bg-white/5"
+                          className="border-white/10 transition even:bg-white/2 hover:bg-white/5"
                         >
                           {/* COIN */}
                           <TableCell className="font-medium">

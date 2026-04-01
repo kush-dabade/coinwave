@@ -74,6 +74,7 @@ export default function PortfolioPage() {
 
   useEffect(() => {
     if (!open) return
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setRows(
       holdings.length
         ? holdings.map((h) => ({
