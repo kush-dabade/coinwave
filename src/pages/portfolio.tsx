@@ -11,6 +11,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import { CardSkeleton, ChartSkeleton, Skeleton, TableSkeleton } from "@/components/ui/skeleton"
+import { AnimatedNumber } from "@/components/ui/animated-number"
 
 export default function PortfolioPage() {
   const [prices, setPrices] = useState<Record<string, number>>({})
@@ -209,7 +211,36 @@ export default function PortfolioPage() {
   }))
 
   if (!Object.keys(prices).length)
-    return <div className="p-6 text-gray-400">Loading...</div>
+    return (
+      <div className="space-y-6 p-2">
+        <div className="flex items-center justify-between">
+          <div className="space-y-2">
+            <Skeleton className="h-7 w-40" />
+            <Skeleton className="h-3 w-28 rounded-full" />
+          </div>
+          <Skeleton className="h-9 w-[7.5rem] rounded-lg" />
+        </div>
+
+        <div className="grid grid-cols-3 gap-6 rounded-2xl bg-neutral-900 p-6">
+          <CardSkeleton lines={2} className="border-0 bg-transparent p-0" />
+          <CardSkeleton lines={2} className="border-0 bg-transparent p-0" />
+          <CardSkeleton lines={2} className="border-0 bg-transparent p-0" />
+        </div>
+
+        <div className="grid grid-cols-2 gap-6">
+          <div className="rounded-2xl bg-neutral-900 p-6">
+            <ChartSkeleton />
+          </div>
+          <div className="rounded-2xl bg-neutral-900 p-6">
+            <CardSkeleton lines={5} className="border-0 bg-transparent p-0" />
+          </div>
+        </div>
+
+        <div className="rounded-2xl bg-neutral-900 p-6">
+          <TableSkeleton rows={8} columns={7} />
+        </div>
+      </div>
+    )
 
   return (
     <div className="space-y-6 p-2">
@@ -231,13 +262,19 @@ export default function PortfolioPage() {
         <div>
           <p className="text-sm text-gray-400">Total Value</p>
           <h2 className="text-3xl font-semibold">
-            ${totalValue.toLocaleString()}
+            <AnimatedNumber
+              value={totalValue}
+              format={(v) => `$${v.toLocaleString()}`}
+            />
           </h2>
         </div>
         <div>
           <p className="text-sm text-gray-400">Total PnL</p>
           <p className={totalPnL >= 0 ? "text-green-400" : "text-red-400"}>
-            ${totalPnL.toLocaleString()}
+            <AnimatedNumber
+              value={totalPnL}
+              format={(v) => `$${v.toLocaleString()}`}
+            />
           </p>
         </div>
         <div>
@@ -264,7 +301,11 @@ export default function PortfolioPage() {
                 <p className="text-xs text-gray-400">Diversification</p>
 
                 <p className="text-lg font-semibold">
-                  {diversificationScoreAdvanced.toFixed(0)}
+                  <AnimatedNumber
+                    value={diversificationScoreAdvanced}
+                    flash={false}
+                    format={(v) => v.toFixed(0)}
+                  />
                   <span className="text-xs text-gray-400"> / 100</span>
                 </p>
 
@@ -292,7 +333,13 @@ export default function PortfolioPage() {
                 <p className="text-lg font-semibold">
                   {topHolding.symbol}
                   <span className="ml-1 text-xs text-gray-400">
-                    ({topHolding.allocation.toFixed(1)}%)
+                    (
+                    <AnimatedNumber
+                      value={topHolding.allocation}
+                      flash={false}
+                      format={(v) => `${v.toFixed(1)}%`}
+                    />
+                    )
                   </span>
                 </p>
               </div>

@@ -1,5 +1,12 @@
 /* eslint-disable react-hooks/set-state-in-effect */
-import { Button } from "../components/ui/button"
+import { Button } from "@/components/ui/button"
+
+import {
+  HoverCard,
+  HoverCardContent,
+  HoverCardTrigger,
+} from "@/components/ui/hover-card"
+
 import {
   Card,
   CardHeader,
@@ -22,11 +29,19 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
+import {
+  CardSkeleton,
+  ChartSkeleton,
+  Skeleton,
+  TableSkeleton,
+} from "@/components/ui/skeleton"
+import { AnimatedNumber } from "@/components/ui/animated-number"
 
-import { useEffect, useState, useCallback } from "react"
+import { useCallback, useEffect, useId, useState } from "react"
 
 import { COIN_MAP } from "@/lib/portfolio"
 
+import { PieChart, TrendingUp } from "lucide-react"
 interface ChartDataPoint {
   date: string
   value: number
@@ -127,7 +142,7 @@ function CustomContent({
   const area = width * height
 
   return (
-    <g style={{ transition: "all 0.2s ease, cursor: pointer" }}>
+    <g style={{ transition: "all 0.2s ease", cursor: "pointer" }}>
       <rect
         x={x}
         y={y}
@@ -230,6 +245,9 @@ function PortfolioHeatmap({ data }: { data: HeatmapDataPoint[] }) {
 }
 
 function MiniChart({ data }: { data: ChartDataPoint[] }) {
+  const gradientId = useId().replace(/:/g, "")
+  const glowId = useId().replace(/:/g, "")
+
   return (
     <div className="mt-3 h-32">
       <ChartContainer
@@ -241,15 +259,62 @@ function MiniChart({ data }: { data: ChartDataPoint[] }) {
         }}
       >
         <AreaChart data={data}>
+          <defs>
+            <linearGradient id={`mini-fill-${gradientId}`} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="hsl(142 76% 36%)" stopOpacity={0.4} />
+              <stop
+                offset="100%"
+                stopColor="hsl(142 76% 36%)"
+                stopOpacity={0.04}
+              />
+            </linearGradient>
+            <filter
+              id={`mini-glow-${glowId}`}
+              x="-20%"
+              y="-20%"
+              width="140%"
+              height="140%"
+            >
+              <feDropShadow
+                dx="0"
+                dy="0"
+                stdDeviation="2"
+                floodColor="hsl(142 76% 36%)"
+                floodOpacity="0.35"
+              />
+            </filter>
+          </defs>
           <XAxis dataKey="date" hide />
-          <ChartTooltip content={<ChartTooltipContent />} />
+          <ChartTooltip
+            cursor={{ stroke: "rgba(255,255,255,0.22)", strokeWidth: 1 }}
+            wrapperStyle={{
+              transition: "transform 120ms ease-out",
+              pointerEvents: "none",
+            }}
+            content={
+              <ChartTooltipContent
+                className="border-white/15 bg-neutral-900/95 text-white shadow-[0_14px_30px_-16px_rgba(0,0,0,0.9)] backdrop-blur-md"
+                indicator="line"
+              />
+            }
+          />
           <Area
             dataKey="value"
             type="monotone"
-            fill="hsl(142, 76%, 36%)"
-            fillOpacity={0.15}
-            stroke="hsl(142, 76%, 36%)"
+            fill={`url(#mini-fill-${gradientId})`}
+            stroke="hsl(142 76% 36%)"
             strokeWidth={2}
+            filter={`url(#mini-glow-${glowId})`}
+            isAnimationActive
+            animationDuration={720}
+            animationEasing="ease-out"
+            dot={false}
+            activeDot={{
+              r: 4.5,
+              stroke: "rgba(255,255,255,0.9)",
+              strokeWidth: 1.5,
+              fill: "hsl(142 76% 36%)",
+            }}
           />
         </AreaChart>
       </ChartContainer>
@@ -315,6 +380,15 @@ const Dashboard = () => {
     0
   )
 
+  const totalPnL = portfolioCoins.reduce((sum, c: CoinWithAmount) => {
+    const holding = holdings.find((h) => COIN_MAP[h.symbol] === c.id)
+
+    if (!holding) return sum
+
+    const pnl = (c.current_price - holding.avgPrice) * holding.amount
+    return sum + pnl
+  }, 0)
+
   const heatmapData = portfolioCoins.map((coin: CoinWithAmount) => {
     const value = coin.amount * coin.current_price
 
@@ -326,9 +400,18 @@ const Dashboard = () => {
     }
   })
 
+  const isDashboardLoading =
+    !globalData ||
+    coins.length === 0 ||
+    marketChart.length === 0 ||
+    volumeChart.length === 0
+
   return (
     <div className="my-6 space-y-6 p-2">
-      <Card className="border-white/10 bg-linear-to-b from-white/3 to-white/1 px-5 py-5 shadow-lg shadow-black/20 backdrop-blur-xl">
+      <Card
+        interactive
+        className="border-white/10 bg-linear-to-b from-white/3 to-white/1 px-5 py-5 shadow-lg shadow-black/20 backdrop-blur-xl"
+      >
         <CardHeader className="mb-4 flex flex-row items-start justify-between p-0">
           {/* LEFT */}
           <div>
@@ -341,58 +424,225 @@ const Dashboard = () => {
             </CardDescription>
           </div>
           {/* RIGHT */}
-          <div className="flex items-center gap-2 rounded-md bg-white/5 p-1">
-            <Button
-              variant="secondary"
-              className="rounded-md bg-white/10 px-4 py-1.5 text-sm font-medium"
-            >
-              Portfolio
-            </Button>
-            <Button
-              variant="green"
-              className="rounded-md px-4 py-1.5 text-sm font-medium text-white"
-            >
-              P&L
-            </Button>
+          <div className="flex items-center gap-2">
+            <HoverCard>
+              <HoverCardTrigger asChild>
+                <Button className="group relative rounded-lg border border-white/10 bg-white/5 px-4 py-1.5 text-sm font-medium text-white/80 backdrop-blur-md transition-all duration-200 hover:border-white/20 hover:bg-white/10 hover:text-white">
+                  Portfolio
+                  <PieChart className="h-4 w-4 opacity-70" />
+                </Button>
+              </HoverCardTrigger>
+
+              <HoverCardContent className="w-72 border-white/10 bg-neutral-900/90 shadow-xl backdrop-blur-xl transition-all duration-200 data-[state=open]:animate-in data-[state=open]:zoom-in-95 data-[state=open]:fade-in">
+                <div className="space-y-4 text-sm">
+                  {/* HEADER */}
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs text-white/50">Portfolio</p>
+                    <span className="text-[10px] text-white/40">Live</span>
+                  </div>
+
+                  {/* VALUE */}
+                  <div>
+                    <p className="text-xs text-white/50">Total Value</p>
+                    <p className="text-xl font-semibold tabular-nums">
+                      <AnimatedNumber
+                        value={totalValue}
+                        format={(v) => `$${v.toLocaleString()}`}
+                      />
+                    </p>
+                  </div>
+
+                  {/* STATS */}
+                  <div className="grid grid-cols-2 gap-3 text-xs">
+                    <div className="rounded-md bg-white/5 p-2">
+                      <p className="text-white/50">Assets</p>
+                      <p className="font-medium">{portfolioCoins.length}</p>
+                    </div>
+
+                    <div className="rounded-md bg-white/5 p-2">
+                      <p className="text-white/50">Top Holding</p>
+                      <p className="font-medium">
+                        {portfolioCoins.length > 0
+                          ? portfolioCoins.reduce(
+                              (a: CoinWithAmount, b: CoinWithAmount) =>
+                                a.amount * a.current_price >
+                                b.amount * b.current_price
+                                  ? a
+                                  : b
+                            ).name
+                          : "-"}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </HoverCardContent>
+            </HoverCard>
+
+            <HoverCard>
+              <HoverCardTrigger asChild>
+                <Button className="group relative rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-4 py-1.5 text-sm font-medium text-emerald-300 transition-all duration-200 hover:bg-emerald-500/20 hover:text-emerald-200">
+                  P&L <TrendingUp className="h-4 w-4 opacity-70" />
+                </Button>
+              </HoverCardTrigger>
+
+              <HoverCardContent className="w-72 border-white/10 bg-neutral-900/90 shadow-xl backdrop-blur-xl transition-all duration-200 data-[state=open]:animate-in data-[state=open]:zoom-in-95 data-[state=open]:fade-in">
+                <div className="space-y-4 text-sm">
+                  {/* HEADER */}
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs text-white/50">Performance</p>
+                    <span className="text-[10px] text-white/40">24h</span>
+                  </div>
+
+                  {/* TOTAL PNL */}
+                  <div>
+                    <p className="text-xs text-white/50">Total P&L</p>
+                    <p
+                      className={`text-xl font-semibold tabular-nums ${
+                        totalPnL >= 0 ? "text-emerald-400" : "text-red-400"
+                      }`}
+                    >
+                      <AnimatedNumber
+                        value={totalPnL}
+                        format={(v) => `$${v.toLocaleString()}`}
+                      />
+                    </p>
+                  </div>
+
+                  {/* BEST / WORST */}
+                  {portfolioCoins.length > 0 &&
+                    (() => {
+                      type EnrichedCoin = {
+                        name: string
+                        symbol: string
+                        pnl: number
+                      }
+
+                      const enriched: EnrichedCoin[] = portfolioCoins
+                        .map((coin: CoinWithAmount) => {
+                          const h = holdings.find(
+                            (h) => COIN_MAP[h.symbol] === coin.id
+                          )
+                          if (!h) return null
+
+                          const pnl =
+                            (coin.current_price - h.avgPrice) * h.amount
+
+                          return {
+                            name: coin.name,
+                            symbol: coin.symbol.toUpperCase(),
+                            pnl,
+                          }
+                        })
+                        .filter((c): c is EnrichedCoin => c !== null)
+
+                      if (enriched.length === 0) return null
+
+                      const best = enriched.reduce((a, b) =>
+                        a.pnl > b.pnl ? a : b
+                      )
+
+                      const worst = enriched.reduce((a, b) =>
+                        a.pnl < b.pnl ? a : b
+                      )
+
+                      return (
+                        <div className="grid grid-cols-2 gap-3 text-xs">
+                          {/* BEST */}
+                          <div className="rounded-md bg-emerald-500/10 p-2">
+                            <p className="text-emerald-300">Best</p>
+                            <p className="font-semibold text-white">
+                              {best.name}
+                            </p>
+                            <p className="text-[10px] text-white/40">
+                              {best.symbol}
+                            </p>
+                          </div>
+
+                          {/* WORST */}
+                          <div className="rounded-md bg-red-500/10 p-2">
+                            <p className="text-red-300">Worst</p>
+                            <p className="font-semibold text-white">
+                              {worst.name}
+                            </p>
+                            <p className="text-[10px] text-white/40">
+                              {worst.symbol}
+                            </p>
+                          </div>
+                        </div>
+                      )
+                    })()}
+                </div>
+              </HoverCardContent>
+            </HoverCard>
           </div>
         </CardHeader>
         <CardContent className="p-0">
           <div className="grid grid-cols-3 gap-4">
             {/* Market Cap */}
-            <Card className="border-white/10 bg-white/5 p-4 transition-all duration-200 hover:scale-[1.01] hover:bg-white/10">
+            <Card interactive className="border-white/10 bg-white/5 p-4">
               <p className="text-xs tracking-wide text-white/50 uppercase">
                 Market Cap
               </p>
-              <h2 className="text-xl font-semibold tracking-tight">
-                {globalData ? (
-                  `$${(globalData.total_market_cap.usd / 1e12).toFixed(2)}T`
-                ) : (
-                  <div className="h-6 w-24 animate-pulse rounded bg-white/10" />
-                )}
-              </h2>
-              {marketChart.length > 0 && <MiniChart data={marketChart} />}
+              {isDashboardLoading ? (
+                <ChartSkeleton className="mt-2" />
+              ) : (
+                <>
+                  <h2 className="text-xl font-semibold tracking-tight">
+                    <AnimatedNumber
+                      value={(globalData?.total_market_cap.usd || 0) / 1e12}
+                      format={(v) => `$${v.toFixed(2)}T`}
+                    />
+                  </h2>
+                  <MiniChart data={marketChart} />
+                </>
+              )}
             </Card>
 
             {/* Volume */}
-            <Card className="border-white/10 bg-white/5 p-4 transition-all duration-200 hover:scale-[1.01] hover:bg-white/10">
+            <Card interactive className="border-white/10 bg-white/5 p-4">
               <p className="text-xs tracking-wide text-white/50 uppercase">
                 24h Volume
               </p>
-              <h2 className="text-xl font-semibold tracking-tight">
-                {globalData
-                  ? `$${(globalData.total_volume.usd / 1e9).toFixed(2)}B`
-                  : "Loading..."}
-              </h2>
-              {volumeChart.length > 0 && <MiniChart data={volumeChart} />}
+              {isDashboardLoading ? (
+                <ChartSkeleton className="mt-2" />
+              ) : (
+                <>
+                  <h2 className="text-xl font-semibold tracking-tight">
+                    <AnimatedNumber
+                      value={(globalData?.total_volume.usd || 0) / 1e9}
+                      format={(v) => `$${v.toFixed(2)}B`}
+                    />
+                  </h2>
+                  <MiniChart data={volumeChart} />
+                </>
+              )}
             </Card>
 
             {/* Trending */}
-            <Card className="border-white/10 bg-white/5 p-4 transition-all duration-200 hover:scale-[1.01] hover:bg-white/10">
+            <Card interactive className="border-white/10 bg-white/5 p-4">
               <p className="text-xs tracking-wide text-white/50 uppercase">
                 Trending Currencies
               </p>
               <div className="mt-1 text-sm font-medium">
-                {coins.length > 0 ? (
+                {isDashboardLoading ? (
+                  <div className="space-y-2">
+                    {Array.from({ length: 5 }).map((_, index) => (
+                      <div
+                        key={index}
+                        className="flex items-center justify-between rounded-md py-2"
+                      >
+                        <div className="flex items-center gap-3">
+                          <Skeleton className="h-6 w-6 rounded-full" />
+                          <Skeleton className="h-3 w-28 rounded-full" />
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Skeleton className="h-3 w-16 rounded-full" />
+                          <Skeleton className="h-3 w-12 rounded-full" />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : coins.length > 0 ? (
                   <div className="divide-y divide-white/10">
                     {coins.slice(0, 5).map((coin) => {
                       const isUp = coin.price_change_percentage_24h >= 0
@@ -414,7 +664,10 @@ const Dashboard = () => {
                           {/* RIGHT */}
                           <div className="flex items-center gap-2 text-sm">
                             <p className="text-white/80">
-                              ${coin.current_price.toFixed(2)}
+                              <AnimatedNumber
+                                value={coin.current_price}
+                                format={(v) => `$${v.toFixed(2)}`}
+                              />
                             </p>
 
                             <div
@@ -424,10 +677,11 @@ const Dashboard = () => {
                             >
                               <span>{isUp ? "▲" : "▼"}</span>
                               <span>
-                                {Math.abs(
-                                  coin.price_change_percentage_24h
-                                ).toFixed(2)}
-                                %
+                                <AnimatedNumber
+                                  value={Math.abs(coin.price_change_percentage_24h)}
+                                  flash={false}
+                                  format={(v) => `${v.toFixed(2)}%`}
+                                />
                               </span>
                             </div>
                           </div>
@@ -437,7 +691,7 @@ const Dashboard = () => {
                   </div>
                 ) : (
                   <div className="flex h-40 items-center justify-center text-sm text-white/40">
-                    No portfolio data yet
+                    Market data unavailable
                   </div>
                 )}
               </div>
@@ -445,7 +699,10 @@ const Dashboard = () => {
           </div>
         </CardContent>
       </Card>
-      <Card className="border-white/10 bg-linear-to-b from-white/3 to-white/1 px-5 py-5 shadow-lg shadow-black/20 backdrop-blur-xl">
+      <Card
+        interactive
+        className="border-white/10 bg-linear-to-b from-white/3 to-white/1 px-5 py-5 shadow-lg shadow-black/20 backdrop-blur-xl"
+      >
         <CardHeader className="mb-4 p-0">
           <CardTitle className="text-xl font-semibold tracking-tight">
             Portfolio & Market
@@ -458,116 +715,130 @@ const Dashboard = () => {
         <CardContent className="p-0">
           <div className="grid grid-cols-2 gap-4">
             {/* HEATMAP */}
-            <Card className="border-white/10 bg-white/5 p-4 transition-all duration-200 hover:scale-[1.01] hover:bg-white/10">
+            <Card interactive className="border-white/10 bg-white/5 p-4">
               <p className="mb-3 text-sm text-white/60">Portfolio Heatmap</p>
 
               {portfolioCoins.length > 0 ? (
                 <PortfolioHeatmap data={heatmapData} />
+              ) : isDashboardLoading ? (
+                <CardSkeleton lines={4} className="border-0 bg-transparent p-0" />
               ) : (
-                "Loading..."
+                <div className="py-8 text-center text-sm text-white/40">
+                  Add assets to view allocation heatmap
+                </div>
               )}
             </Card>
 
             {/* ALL COINS TABLE */}
-            <Card className="border-white/10 bg-white/5 p-4 transition-all duration-200 hover:scale-[1.01] hover:bg-white/10">
+            <Card interactive className="border-white/10 bg-white/5 p-4">
               <p className="mb-3 text-sm text-white/60">All Coins</p>
               <div className="max-h-72 overflow-y-auto pr-2">
-                <Table>
-                  <TableHeader className="sticky top-0 bg-black/10 backdrop-blur">
-                    <TableRow className="border-white/10 transition even:bg-white/2 hover:bg-white/5">
-                      <TableHead className="text-xs tracking-wide text-white/50 uppercase">
-                        Coin
-                      </TableHead>
-                      <TableHead className="text-xs tracking-wide text-white/50 uppercase">
-                        Price
-                      </TableHead>
-                      <TableHead className="text-right text-xs tracking-wide text-white/50 uppercase">
-                        24h
-                      </TableHead>
-                    </TableRow>
-                  </TableHeader>
+                {isDashboardLoading ? (
+                  <TableSkeleton rows={7} columns={3} />
+                ) : (
+                  <Table>
+                    <TableHeader className="sticky top-0 bg-black/10 backdrop-blur">
+                      <TableRow className="border-white/10 transition even:bg-white/2 hover:bg-white/5">
+                        <TableHead className="text-xs tracking-wide text-white/50 uppercase">
+                          Coin
+                        </TableHead>
+                        <TableHead className="text-xs tracking-wide text-white/50 uppercase">
+                          Price
+                        </TableHead>
+                        <TableHead className="text-right text-xs tracking-wide text-white/50 uppercase">
+                          24h
+                        </TableHead>
+                      </TableRow>
+                    </TableHeader>
 
-                  <TableBody>
-                    {coins.map((coin) => {
-                      const isUp = coin.price_change_percentage_24h >= 0
-                      const change = Math.abs(
-                        coin.price_change_percentage_24h
-                      ).toFixed(2)
+                    <TableBody>
+                      {coins.map((coin) => {
+                        const isUp = coin.price_change_percentage_24h >= 0
 
-                      return (
-                        <TableRow
-                          key={coin.id}
-                          className="border-white/10 transition even:bg-white/2 hover:bg-white/5"
-                        >
-                          {/* COIN */}
-                          <TableCell className="font-medium">
-                            <div className="flex min-w-0 items-center gap-3">
-                              <img
-                                src={coin.image}
-                                className="h-6 w-6 shrink-0 rounded-full"
-                              />
-
-                              <div className="flex min-w-0 flex-col">
-                                {/* NAME (truncate) */}
-                                <span className="max-w-30 truncate text-white/90">
-                                  {coin.name}
-                                </span>
-
-                                {/* SYMBOL */}
-                                <span className="max-w-30 truncate text-xs text-white/50 uppercase">
-                                  {coin.id}
-                                </span>
-                              </div>
-                            </div>
-                          </TableCell>
-                          {/* PRICE */}
-                          <TableCell>
-                            <div className="flex flex-col">
-                              <span className="text-white/90">
-                                ${coin.current_price.toLocaleString()}
-                              </span>
-
-                              {/* subtle secondary info */}
-                              <span className="text-xs text-white/50">USD</span>
-                            </div>
-                          </TableCell>
-
-                          {/* 24H CHANGE */}
-                          <TableCell className="text-right">
-                            <div className="flex flex-col items-end gap-1">
-                              {/* % VALUE */}
-                              <span
-                                className={`text-sm font-medium ${
-                                  isUp ? "text-emerald-400" : "text-red-400"
-                                }`}
-                              >
-                                {isUp ? "+" : "-"}
-                                {change}%
-                              </span>
-
-                              {/* MINI BAR (visual strength) */}
-                              <div className="h-1.5 w-16 overflow-hidden rounded-full bg-white/10">
-                                <div
-                                  className={`h-full ${
-                                    isUp ? "bg-emerald-400" : "bg-red-400"
-                                  }`}
-                                  style={{
-                                    width: `${Math.min(
-                                      Math.abs(
-                                        coin.price_change_percentage_24h
-                                      ),
-                                      100
-                                    )}%`,
-                                  }}
+                        return (
+                          <TableRow
+                            key={coin.id}
+                            className="border-white/10 transition even:bg-white/2 hover:bg-white/5"
+                          >
+                            {/* COIN */}
+                            <TableCell className="font-medium">
+                              <div className="flex min-w-0 items-center gap-3">
+                                <img
+                                  src={coin.image}
+                                  className="h-6 w-6 shrink-0 rounded-full"
                                 />
+
+                                <div className="flex min-w-0 flex-col">
+                                  {/* NAME (truncate) */}
+                                  <span className="max-w-30 truncate text-white/90">
+                                    {coin.name}
+                                  </span>
+
+                                  {/* SYMBOL */}
+                                  <span className="max-w-30 truncate text-xs text-white/50 uppercase">
+                                    {coin.id}
+                                  </span>
+                                </div>
                               </div>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      )
-                    })}
-                  </TableBody>
-                </Table>
+                            </TableCell>
+                            {/* PRICE */}
+                            <TableCell>
+                              <div className="flex flex-col">
+                                <span className="text-white/90">
+                                  <AnimatedNumber
+                                    value={coin.current_price}
+                                    format={(v) => `$${v.toLocaleString()}`}
+                                  />
+                                </span>
+
+                                {/* subtle secondary info */}
+                                <span className="text-xs text-white/50">USD</span>
+                              </div>
+                            </TableCell>
+
+                            {/* 24H CHANGE */}
+                            <TableCell className="text-right">
+                              <div className="flex flex-col items-end gap-1">
+                                {/* % VALUE */}
+                                <span
+                                  className={`text-sm font-medium ${
+                                    isUp ? "text-emerald-400" : "text-red-400"
+                                  }`}
+                                >
+                                  {isUp ? "+" : "-"}
+                                  <AnimatedNumber
+                                    value={Math.abs(
+                                      coin.price_change_percentage_24h
+                                    )}
+                                    flash={false}
+                                    format={(v) => `${v.toFixed(2)}%`}
+                                  />
+                                </span>
+
+                                {/* MINI BAR (visual strength) */}
+                                <div className="h-1.5 w-16 overflow-hidden rounded-full bg-white/10">
+                                  <div
+                                    className={`h-full ${
+                                      isUp ? "bg-emerald-400" : "bg-red-400"
+                                    }`}
+                                    style={{
+                                      width: `${Math.min(
+                                        Math.abs(
+                                          coin.price_change_percentage_24h
+                                        ),
+                                        100
+                                      )}%`,
+                                    }}
+                                  />
+                                </div>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        )
+                      })}
+                    </TableBody>
+                  </Table>
+                )}
               </div>
             </Card>
           </div>

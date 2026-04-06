@@ -5,14 +5,19 @@ import { cn } from "@/lib/utils"
 function Card({
   className,
   size = "default",
+  interactive = false,
   ...props
-}: React.ComponentProps<"div"> & { size?: "default" | "sm" }) {
+}: React.ComponentProps<"div"> & {
+  size?: "default" | "sm"
+  interactive?: boolean
+}) {
   return (
     <div
       data-slot="card"
       data-size={size}
+      data-interactive={interactive}
       className={cn(
-        "group/card flex flex-col gap-4 overflow-hidden rounded-xl bg-card py-4 text-sm text-card-foreground ring-1 ring-foreground/10 has-data-[slot=card-footer]:pb-0 has-[>img:first-child]:pt-0 data-[size=sm]:gap-3 data-[size=sm]:py-3 data-[size=sm]:has-data-[slot=card-footer]:pb-0 *:[img:first-child]:rounded-t-xl *:[img:last-child]:rounded-b-xl",
+        "group/card flex flex-col gap-4 overflow-hidden rounded-xl bg-card py-4 text-sm text-card-foreground ring-1 ring-foreground/10 has-data-[slot=card-footer]:pb-0 has-[>img:first-child]:pt-0 data-[size=sm]:gap-3 data-[size=sm]:py-3 data-[size=sm]:has-data-[slot=card-footer]:pb-0 *:[img:first-child]:rounded-t-xl *:[img:last-child]:rounded-b-xl data-[interactive=true]:relative data-[interactive=true]:isolate data-[interactive=true]:bg-white/[0.02] data-[interactive=true]:shadow-[0_10px_26px_-18px_rgba(0,0,0,0.78)] data-[interactive=true]:transition-[transform,box-shadow,background-color,ring-color,border-color] data-[interactive=true]:duration-200 data-[interactive=true]:ease-out data-[interactive=true]:will-change-transform data-[interactive=true]:hover:-translate-y-1 data-[interactive=true]:hover:shadow-[0_20px_40px_-20px_rgba(0,0,0,0.88)] data-[interactive=true]:hover:ring-white/20 data-[interactive=true]:before:pointer-events-none data-[interactive=true]:before:absolute data-[interactive=true]:before:inset-0 data-[interactive=true]:before:rounded-[inherit] data-[interactive=true]:before:bg-linear-to-b data-[interactive=true]:before:from-white/[0.09] data-[interactive=true]:before:to-transparent data-[interactive=true]:before:opacity-0 data-[interactive=true]:before:transition-opacity data-[interactive=true]:before:duration-200 data-[interactive=true]:before:ease-out data-[interactive=true]:hover:before:opacity-100",
         className
       )}
       {...props}

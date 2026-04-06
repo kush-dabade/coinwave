@@ -1,6 +1,7 @@
 "use client"
 
 import type { ColumnDef } from "@tanstack/react-table"
+import { AnimatedNumber } from "@/components/ui/animated-number"
 
 export type HoldingRow = {
   symbol: string
@@ -20,13 +21,22 @@ export const columns: ColumnDef<HoldingRow>[] = [
   {
     accessorKey: "amount",
     header: "Amount",
+    cell: ({ row }) => {
+      const value = row.getValue("amount") as number
+      return <AnimatedNumber value={value} format={(v) => v.toFixed(4)} />
+    },
   },
   {
     accessorKey: "price",
     header: "Price",
     cell: ({ row }) => {
       const value = row.getValue("price") as number
-      return `$${value.toLocaleString()}`
+      return (
+        <AnimatedNumber
+          value={value}
+          format={(v) => `$${v.toLocaleString()}`}
+        />
+      )
     },
   },
   {
@@ -34,7 +44,12 @@ export const columns: ColumnDef<HoldingRow>[] = [
     header: "Value",
     cell: ({ row }) => {
       const value = row.getValue("value") as number
-      return `$${value.toLocaleString()}`
+      return (
+        <AnimatedNumber
+          value={value}
+          format={(v) => `$${v.toLocaleString()}`}
+        />
+      )
     },
   },
   {
@@ -47,7 +62,11 @@ export const columns: ColumnDef<HoldingRow>[] = [
 
       return (
         <span className={isProfit ? "text-green-500" : "text-red-500"}>
-          {isProfit ? "+" : "-"}${Math.abs(pnl).toLocaleString()}
+          {isProfit ? "+" : "-"}
+          <AnimatedNumber
+            value={Math.abs(pnl)}
+            format={(v) => `$${v.toLocaleString()}`}
+          />
         </span>
       )
     },
@@ -62,7 +81,10 @@ export const columns: ColumnDef<HoldingRow>[] = [
       return (
         <span className={isProfit ? "text-green-500" : "text-red-500"}>
           {isProfit ? "+" : "-"}
-          {Math.abs(percent).toFixed(2)}%
+          <AnimatedNumber
+            value={Math.abs(percent)}
+            format={(v) => `${v.toFixed(2)}%`}
+          />
         </span>
       )
     },
@@ -73,7 +95,13 @@ export const columns: ColumnDef<HoldingRow>[] = [
     cell: ({ row }) => {
       const value = row.getValue("allocation") as number
 
-      return <span>{value.toFixed(2)}%</span>
+      return (
+        <AnimatedNumber
+          value={value}
+          flash={false}
+          format={(v) => `${v.toFixed(2)}%`}
+        />
+      )
     },
   },
 ]
