@@ -40,27 +40,34 @@ function getIcon(type: SentimentCardItem["type"]) {
 }
 
 export function SentimentCards({ loading, cards }: SentimentCardsProps) {
+  if (loading) {
+    return (
+      <section className="space-y-3">
+        <p className="text-xs tracking-[0.14em] text-white/45 uppercase">Market Sentiment</p>
+        <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-4">
+          {Array.from({ length: 4 }).map((_, index) => (
+            <Card
+              key={index}
+              interactive
+              className="rounded-2xl border border-white/10 bg-white/5 p-6"
+            >
+              <div className="space-y-3">
+                <Skeleton className="h-3 w-24 rounded-full" />
+                <Skeleton className="h-9 w-32 rounded-lg" />
+                <Skeleton className="h-6 w-24 rounded-full" />
+              </div>
+            </Card>
+          ))}
+        </div>
+      </section>
+    )
+  }
+
   return (
     <section className="space-y-3">
       <p className="text-xs tracking-[0.14em] text-white/45 uppercase">Market Sentiment</p>
       <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-4">
-        {(loading ? Array.from({ length: 4 }) : cards).map((card, index) => {
-          if (loading) {
-            return (
-              <Card
-                key={index}
-                interactive
-                className="rounded-2xl border border-white/10 bg-white/5 p-6"
-              >
-                <div className="space-y-3">
-                  <Skeleton className="h-3 w-24 rounded-full" />
-                  <Skeleton className="h-9 w-32 rounded-lg" />
-                  <Skeleton className="h-6 w-24 rounded-full" />
-                </div>
-              </Card>
-            )
-          }
-
+        {cards.map((card) => {
           const Icon = getIcon(card.type)
           const positive = card.change >= 0
           return (
@@ -103,4 +110,3 @@ export function SentimentCards({ loading, cards }: SentimentCardsProps) {
     </section>
   )
 }
-
