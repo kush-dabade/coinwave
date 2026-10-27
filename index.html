@@ -2,12 +2,35 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>vite-app</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>CoinWave</title>
+    <meta
+      name="description"
+      content="A crypto market workstation: markets, charting, screening, research and portfolio analytics, with your data kept in your browser."
+    />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="theme-color" content="#0a0c10" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="preconnect" href="https://api.coingecko.com" crossorigin />
+    <script>
+      // Apply the saved theme before first paint to avoid a flash of the wrong one.
+      ;(function () {
+        try {
+          var stored = localStorage.getItem("theme")
+          // Dark is the default; "system" follows the OS.
+          var dark =
+            stored === null ||
+            stored === "dark" ||
+            (stored === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches)
+          document.documentElement.classList.add(dark ? "dark" : "light")
+          document.documentElement.style.colorScheme = dark ? "dark" : "light"
+        } catch (e) {}
+      })()
+    </script>
   </head>
   <body>
     <div id="root"></div>
+    <noscript>CoinWave needs JavaScript to load market data.</noscript>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
